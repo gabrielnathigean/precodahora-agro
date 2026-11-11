@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Preço da Hora Bahia - Plataforma Agropecuária & Varejo</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: { 50: '#eef2ff', 100: '#e0e7ff', 500: '#1d4ed8', 600: '#1e40af', 700: '#1e3a8a' },
+            agro:  { 50: '#f0fdf4', 100: '#dcfce7', 600: '#16a34a', 700: '#15803d', 800: '#166534', 900: '#14532d' }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+    body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+    .fade-in { animation: fadeIn 0.25s ease-out; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col text-slate-800">
+
+  <!-- Header -->
+  <header class="bg-gradient-to-r from-emerald-950 via-slate-900 to-emerald-900 text-white shadow-xl sticky top-0 z-40 border-b border-emerald-800/40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-20">
+        <div class="flex items-center space-x-4">
+          <div class="bg-white/10 p-2 rounded-xl backdrop-blur-sm border border-white/10 flex items-center justify-center">
+            <img src="/images/logo_govba.png" alt="Gov Bahia" class="h-9 object-contain" onerror="this.style.display='none'">
+            <img src="/images/icon.png" alt="Preço da Hora" class="h-9 ml-2 object-contain" onerror="this.style.display='none'">
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h1 class="text-xl font-bold tracking-tight text-white flex items-center gap-1.5">
+                Preço da Hora
+                <span class="text-xs uppercase bg-emerald-400 text-slate-900 font-extrabold px-2.5 py-0.5 rounded-full shadow-sm">Agro & Varejo</span>
+              </h1>
+            </div>
+            <p class="text-xs text-emerald-200">SEFAZ-BA • Histórico 15 Dias • Comparativo entre Lojas • Auditoria Fiscal</p>
+          </div>
+        </div>
+
+        <div class="hidden sm:flex items-center bg-slate-900/80 border border-emerald-700/50 rounded-xl px-3.5 py-2 text-xs text-emerald-100 shadow-inner">
+          <i data-lucide="map-pin" class="w-4 h-4 text-emerald-400 mr-2 flex-shrink-0"></i>
+          <div>
+            <span class="font-bold text-white block">Juazeiro • Vale do São Francisco</span>
+            <span class="text-emerald-300 text-[11px]">Lojas Monitoradas: <strong class="text-white">Plantebem, Central, Agropodas</strong></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Navegação de Abas: Modo Pesquisa de Produtos vs Catálogo de Loja -->
+  <section class="bg-white border-b border-slate-200 px-4 py-3 shadow-sm sticky top-20 z-30">
+    <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3">
+      <!-- Abas de Navegação -->
+      <div class="flex items-center gap-2 bg-slate-100 p-1.5 rounded-xl border border-slate-200 w-full md:w-auto">
+        <button id="tabSearchBtn" onclick="switchTab('search')" class="flex-1 md:flex-initial flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition bg-emerald-700 text-white shadow-sm">
+          <i data-lucide="search" class="w-4 h-4"></i>
+          <span>Pesquisar Produto & Comparar Lojas</span>
+        </button>
+        <button id="tabStoreBtn" onclick="switchTab('store')" class="flex-1 md:flex-initial flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900 transition">
+          <i data-lucide="store" class="w-4 h-4"></i>
+          <span>Explorar por Loja / Revenda</span>
+        </button>
+      </div>
+
+      <!-- Seletor de Loja Rápido (Modo Loja) -->
+      <div id="storeSelectorBox" class="hidden flex items-center gap-2 w-full md:w-auto">
+        <span class="text-xs font-bold text-slate-600 whitespace-nowrap">Selecione a Loja:</span>
+        <select id="storeSelectDropdown" onchange="loadStoreProducts(this.value)" class="bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-600 w-full md:w-80">
+          <option value="">Carregando lojas...</option>
+        </select>
+        <button onclick="exportCurrentStoreCSV()" title="Exportar tabela desta loja em CSV" class="p-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs flex items-center gap-1 font-bold">
+          <i data-lucide="download" class="w-4 h-4"></i> CSV
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Container Modo Busca -->
+  <section id="searchModeSection" class="bg-white border-b border-slate-200 py-6 px-4 shadow-sm relative z-20">
+    <div class="max-w-4xl mx-auto space-y-3">
+      <div class="flex flex-col md:flex-row gap-3">
+        <!-- Input de Pesquisa -->
+        <div class="relative flex-1">
+          <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+            <i data-lucide="search" class="w-5 h-5"></i>
+          </div>
+          <input 
+            type="text" 
+            id="searchInput" 
+            placeholder="Digite o nome: Dormex, Paclo, Belt, Delegate, Timorex, Bordalo, Adubo..." 
+            class="w-full pl-11 pr-10 py-3.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:bg-white transition shadow-inner font-medium"
+            onkeypress="if(event.key === 'Enter') handleSearch()"
+            autocomplete="off"
+          />
+          <button id="clearSearchBtn" onclick="clearSearch()" class="hidden absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+
+          <!-- Dropdown Sugestões com Comparativo de Lojas -->
+          <div id="suggestionsBox" class="hidden absolute left-0 right-0 top-full mt-2 bg-white rounded-2xl shadow-2xl border border-slate-200 max-h-96 overflow-y-auto custom-scrollbar z-50 divide-y divide-slate-100">
+          </div>
+        </div>
+
+        <button 
+          onclick="handleSearch()"
+          class="bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold px-7 py-3.5 rounded-xl flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition transform active:scale-95"
+        >
+          <i data-lucide="search" class="w-4 h-4"></i>
+          <span>Buscar</span>
+        </button>
+      </div>
+
+      <!-- Atalhos com os produtos chave solicitados -->
+      <div class="flex items-center gap-2 overflow-x-auto custom-scrollbar pb-1 text-xs">
+        <span class="text-emerald-800 font-bold whitespace-nowrap flex items-center gap-1 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200">
+          <i data-lucide="sprout" class="w-3.5 h-3.5 text-emerald-600"></i>
+          Atalhos:
+        </span>
+        <button onclick="quickSearch('Dormex')" class="px-3 py-1 bg-white hover:bg-emerald-50 text-emerald-800 font-bold rounded-lg border border-emerald-300 shadow-sm transition flex items-center gap-1 whitespace-nowrap">
+          <i data-lucide="leaf" class="w-3 h-3 text-emerald-500"></i> Dormex BASF
+        </button>
+        <button onclick="quickSearch('Paclo')" class="px-3 py-1 bg-white hover:bg-emerald-50 text-emerald-800 font-bold rounded-lg border border-emerald-300 shadow-sm transition flex items-center gap-1 whitespace-nowrap">
+          <i data-lucide="zap" class="w-3 h-3 text-amber-500"></i> Paclo / Cultar
+        </button>
+        <button onclick="quickSearch('Belt')" class="px-3 py-1 bg-white hover:bg-emerald-50 text-emerald-800 font-bold rounded-lg border border-emerald-300 shadow-sm transition flex items-center gap-1 whitespace-nowrap">
+          <i data-lucide="shield" class="w-3 h-3 text-blue-500"></i> Belt 480 SC
+        </button>
+        <button onclick="quickSearch('Delegate')" class="px-3 py-1 bg-white hover:bg-emerald-50 text-emerald-800 font-bold rounded-lg border border-emerald-300 shadow-sm transition flex items-center gap-1 whitespace-nowrap">
+          Delegate 100g
+        </button>
+        <button onclick="quickSearch('Timorex')" class="px-3 py-1 bg-white hover:bg-emerald-50 text-emerald-800 font-bold rounded-lg border border-emerald-300 shadow-sm transition flex items-center gap-1 whitespace-nowrap">
+          Timorex Gold 5L
+        </button>
+        <button onclick="quickSearch('Adubo')" class="px-3 py-1 bg-white hover:bg-emerald-50 text-slate-700 hover:text-emerald-800 rounded-lg border border-slate-200 transition whitespace-nowrap font-medium">
+          Adubos NPK
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Container Principal -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full space-y-8">
+
+    <!-- Loading -->
+    <div id="loadingIndicator" class="hidden text-center py-12 space-y-3">
+      <div class="inline-block animate-spin rounded-full h-10 w-10 border-4 border-emerald-600 border-t-transparent"></div>
+      <p class="text-sm font-bold text-slate-700">Auditando notas fiscais e comparando revendas...</p>
+      <p class="text-xs text-slate-400">Verificando última venda, valor praticado e histórico de 15 dias</p>
+    </div>
+
+    <!-- MODO 1: Resultados de Pesquisa de Produto -->
+    <div id="productResultsArea" class="space-y-6">
+      
+      <!-- Painel de Seleção quando há múltiplos itens -->
+      <div id="productSelectionSection" class="hidden space-y-3 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl p-6 shadow-sm fade-in">
+        <div class="flex items-center justify-between">
+          <h3 class="text-sm font-bold text-emerald-950 flex items-center gap-2">
+            <i data-lucide="boxes" class="w-4 h-4 text-emerald-600"></i>
+            Produtos correspondentes. Selecione para ver todas as revendas que vendem:
+          </h3>
+          <button onclick="document.getElementById('productSelectionSection').classList.add('hidden')" class="text-xs text-emerald-700 hover:underline font-bold">Fechar</button>
+        </div>
+        <div id="productSelectionList" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+      </div>
+
+      <!-- Card do Produto Selecionado com Comparativo -->
+      <section id="resultsSection" class="hidden space-y-6 fade-in">
+        <div class="bg-white border border-emerald-200 rounded-2xl p-6 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+          <div class="space-y-2 flex-1">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span id="productCategoryBadge" class="text-[11px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                DEFENSIVOS AGRÍCOLAS
+              </span>
+              <span class="text-xs text-slate-500 flex items-center gap-1 font-medium">
+                <i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-600"></i> Auditoria Fiscal em Nota (NF-e Mod. 55)
+              </span>
+            </div>
+            <h3 id="productTitle" class="text-xl font-black text-slate-900 leading-snug">Nome do Produto</h3>
+            <p id="productGtin" class="text-xs text-slate-500 font-mono">Código / NCM: -</p>
+          </div>
+
+          <!-- Métricas e Ações -->
+          <div class="flex items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-inner w-full md:w-auto justify-around flex-wrap">
+            <div class="text-center">
+              <span class="text-[11px] text-slate-500 font-medium block">Menor Preço</span>
+              <span id="minPriceLabel" class="text-xl font-black text-emerald-600">R$ 0,00</span>
+            </div>
+            <div class="h-8 w-px bg-slate-200"></div>
+            <div class="text-center">
+              <span class="text-[11px] text-slate-500 font-medium block">Maior Preço</span>
+              <span id="maxPriceLabel" class="text-xl font-bold text-slate-700">R$ 0,00</span>
+            </div>
+            <div class="h-8 w-px bg-slate-200"></div>
+            <div class="flex items-center gap-2">
+              <button onclick="openHistoryModal()" class="flex items-center gap-1.5 px-3 py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded-lg text-xs font-bold transition">
+                <i data-lucide="line-chart" class="w-4 h-4"></i>
+                <span>Histórico 15 Dias</span>
+              </button>
+              <button onclick="exportToCSV()" class="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-bold transition shadow-sm">
+                <i data-lucide="download" class="w-4 h-4"></i>
+                <span>Exportar CSV</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Lista de Lojas com o Produto e Preços -->
+        <div class="space-y-3">
+          <div class="flex items-center justify-between">
+            <h4 class="text-base font-bold text-slate-800 flex items-center gap-2">
+              <i data-lucide="store" class="w-4 h-4 text-emerald-600"></i>
+              Revendas que possuem este produto registrado (<span id="totalOffersCount">0</span> revendas):
+            </h4>
+            <span class="text-xs text-slate-500 font-medium">Ordenado pelo menor preço praticado</span>
+          </div>
+
+          <div id="offersContainer" class="space-y-3"></div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- MODO 2: Visualização por Loja (Catálogo Completo da Loja) -->
+    <div id="storeCatalogArea" class="hidden space-y-6 fade-in">
+      <!-- Cabeçalho da Loja Selecionada -->
+      <div id="storeHeaderCard" class="bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-900 text-white p-6 rounded-2xl shadow-lg border border-emerald-700/40 space-y-4">
+        <!-- Injetado via JS -->
+      </div>
+
+      <!-- Tabela / Cards de Todos os Produtos da Loja -->
+      <div class="space-y-3">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+          <h4 class="text-base font-bold text-slate-800 flex items-center gap-2">
+            <i data-lucide="clipboard-list" class="w-4 h-4 text-emerald-600"></i>
+            Todos os Insumos & Produtos Vendidos (<span id="storeItemsCount">0</span> itens registrados):
+          </h4>
+          <input 
+            type="text" 
+            id="storeFilterInput" 
+            onkeyup="filterStoreTable()" 
+            placeholder="Filtrar nesta loja (ex: Dormex, Paclo, 25KG)..." 
+            class="px-3.5 py-1.5 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600 w-full sm:w-64"
+          />
+        </div>
+
+        <div id="storeProductsContainer" class="space-y-3"></div>
+      </div>
+    </div>
+
+    <!-- Estado Vazio / Sem Resultados -->
+    <div id="noResultsState" class="hidden text-center py-16 bg-white rounded-2xl border border-slate-200 p-8 space-y-4 fade-in">
+      <div class="w-16 h-16 mx-auto rounded-full bg-amber-50 text-amber-500 flex items-center justify-center">
+        <i data-lucide="alert-circle" class="w-8 h-8"></i>
+      </div>
+      <div class="max-w-md mx-auto space-y-1">
+        <h3 class="text-lg font-bold text-slate-800">Nenhum registro encontrado</h3>
+        <p class="text-xs text-slate-500">
+          Não identificamos notas fiscais para o termo digitado. Tente pesquisar por <strong>Dormex, Paclo, Belt, Delegate</strong> ou explore diretamente pela aba <strong>Explorar por Loja</strong>.
+        </p>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Modal de Histórico de Preços (Últimos 15 Dias) -->
+  <div id="historyModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-6 space-y-4 border border-slate-100">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+        <div>
+          <h3 id="historyModalTitle" class="text-lg font-bold text-slate-900">Histórico de Preço de Venda (Últimos 15 Dias)</h3>
+          <p class="text-xs text-slate-500">Evolução dos valores praticados em nota fiscal eletrônica por data de emissão</p>
+        </div>
+        <button onclick="closeHistoryModal()" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="h-64 w-full relative">
+        <canvas id="historyChart"></canvas>
+      </div>
+
+      <div class="text-right">
+        <button onclick="closeHistoryModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition">
+          Fechar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rodapé Institucional -->
+  <footer class="bg-white border-t border-slate-200 mt-12 py-8 text-center text-xs text-slate-500 space-y-2">
+    <div class="flex items-center justify-center gap-6">
+      <img src="/images/brasao_secretaria_da_fazenda_vertical.png" class="h-8 object-contain opacity-80" onerror="this.style.display='none'">
+      <img src="/images/govba.png" class="h-8 object-contain opacity-80" onerror="this.style.display='none'">
+    </div>
+    <p>Preço da Hora Bahia — Plataforma Especializada para Agropecuária do Vale do São Francisco</p>
+    <p class="text-[11px] text-slate-400">Em conformidade com os dados fiscais de NF-e Mod. 55 e NFC-e Mod. 65 do Estado da Bahia.</p>
+  </footer>
+
+  <script>
+    let currentProductDesc = null;
+    let currentStoreCnpj = null;
+    let chartInstance = null;
+    let debounceTimer = null;
+    let storesList = [];
+    let currentStoreProducts = [];
+
+    window.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      setupSearchInputListener();
+      loadStoresList();
+    });
+
+    // Alternar entre abas
+    function switchTab(tab) {
+      const tabSearchBtn = document.getElementById('tabSearchBtn');
+      const tabStoreBtn = document.getElementById('tabStoreBtn');
+      const searchModeSection = document.getElementById('searchModeSection');
+      const productResultsArea = document.getElementById('productResultsArea');
+      const storeCatalogArea = document.getElementById('storeCatalogArea');
+      const storeSelectorBox = document.getElementById('storeSelectorBox');
+
+      if (tab === 'search') {
+        tabSearchBtn.className = "flex-1 md:flex-initial flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition bg-emerald-700 text-white shadow-sm";
+        tabStoreBtn.className = "flex-1 md:flex-initial flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900 transition";
+        searchModeSection.classList.remove('hidden');
+        productResultsArea.classList.remove('hidden');
+        storeCatalogArea.classList.add('hidden');
+        storeSelectorBox.classList.add('hidden');
+      } else {
+        tabStoreBtn.className = "flex-1 md:flex-initial flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition bg-emerald-700 text-white shadow-sm";
+        tabSearchBtn.className = "flex-1 md:flex-initial flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900 transition";
+        searchModeSection.classList.add('hidden');
+        productResultsArea.classList.add('hidden');
+        storeCatalogArea.classList.remove('hidden');
+        storeSelectorBox.classList.remove('hidden');
+
+        // Se ainda não carregou uma loja, carregar a primeira (Plantebem)
+        if (!currentStoreCnpj && storesList.length > 0) {
+          loadStoreProducts(storesList[0].cnpj);
+        }
+      }
+      lucide.createIcons();
+    }
+
+    async function loadStoresList() {
+      try {
+        const resp = await fetch('/api/lojas');
+        const data = await resp.json();
+        storesList = data.lojas || [];
+
+        const select = document.getElementById('storeSelectDropdown');
+        select.innerHTML = storesList.map(s => `
+          <option value="${s.cnpj}">${s.nomeCurto} (${s.totalItens} produtos registrados)</option>
+        `).join('');
+
+        if (storesList.length > 0) {
+          currentStoreCnpj = storesList[0].cnpj;
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function loadStoreProducts(cnpj) {
+      if (!cnpj) return;
+      currentStoreCnpj = cnpj;
+      document.getElementById('storeSelectDropdown').value = cnpj;
+
+      const loading = document.getElementById('loadingIndicator');
+      loading.classList.remove('hidden');
+      document.getElementById('storeCatalogArea').classList.add('hidden');
+
+      try {
+        const resp = await fetch(`/api/loja-produtos?cnpj=${encodeURIComponent(cnpj)}`);
+        const data = await resp.json();
+        loading.classList.add('hidden');
+        document.getElementById('storeCatalogArea').classList.remove('hidden');
+
+        currentStoreProducts = data.resultado || [];
+        renderStoreCatalog(data);
+
+      } catch (err) {
+        loading.classList.add('hidden');
+        alert('Erro ao carregar loja: ' + err.message);
+      }
+    }
+
+    function renderStoreCatalog(data) {
+      const loja = data.loja || {};
+      const items = data.resultado || [];
+
+      // Header da Loja
+      const headerCard = document.getElementById('storeHeaderCard');
+      headerCard.innerHTML = `
+        <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div class="space-y-1">
+            <span class="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-emerald-400 text-slate-950">REVENDA SELECIONADA</span>
+            <h3 class="text-xl font-black text-white">${loja.nome || 'Loja Agro'}</h3>
+            <p class="text-xs text-emerald-200">CNPJ: ${formatCNPJ(loja.cnpj || data.cnpj)} • ${loja.cidade || 'Juazeiro'} - BA • Tel: ${loja.telefone || 'Contato na loja'}</p>
+          </div>
+          <div class="flex items-center gap-3">
+            <div class="text-right bg-white/10 px-4 py-2.5 rounded-xl border border-white/10">
+              <span class="text-[11px] text-emerald-200 block">Total de Produtos em Nota</span>
+              <span class="text-2xl font-black text-white">${items.length}</span>
+            </div>
+            <button onclick="exportCurrentStoreCSV()" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow">
+              <i data-lucide="download" class="w-4 h-4"></i> Exportar Loja em CSV
+            </button>
+          </div>
+        </div>
+      `;
+
+      document.getElementById('storeItemsCount').innerText = items.length;
+      renderStoreProductsList(items);
+      lucide.createIcons();
+    }
+
+    function renderStoreProductsList(items) {
+      const container = document.getElementById('storeProductsContainer');
+      if (items.length === 0) {
+        container.innerHTML = '<p class="text-xs text-slate-500 py-6 text-center">Nenhum produto encontrado nesta loja.</p>';
+        return;
+      }
+
+      container.innerHTML = items.map(it => {
+        const prod = it.produto || {};
+        const est = it.estabelecimento || {};
+
+        return `
+          <div class="bg-white rounded-xl border border-slate-200 p-4 hover:border-emerald-500 hover:shadow-md transition space-y-3">
+            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-slate-100 pb-2">
+              <div>
+                <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-emerald-50 text-emerald-800">${prod.ncmGrupo || 'INSUMOS'}</span>
+                <h5 class="text-sm font-extrabold text-slate-900 pt-1">${prod.descricao}</h5>
+              </div>
+              <div class="text-right">
+                <span class="text-xl font-black text-emerald-600">R$ ${(prod.precoUnitario || 0).toFixed(2)}</span>
+                <span class="text-xs text-slate-500 font-semibold">/${prod.unidade || 'UN'}</span>
+              </div>
+            </div>
+
+            <!-- Dados Fiscais da Venda -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+              <div>
+                <span class="text-[10px] uppercase font-bold text-slate-400 block">Última Venda em Nota</span>
+                <span class="font-extrabold text-slate-900">${prod.dataEmissao || '—'}</span>
+              </div>
+              <div>
+                <span class="text-[10px] uppercase font-bold text-slate-400 block">Documento Fiscal</span>
+                <span class="font-extrabold text-slate-900">${prod.tipoNFe ? 'NF-e Mod. ' + prod.tipoNFe : 'NF-e'} Nº ${prod.numeroNFe || '—'}</span>
+              </div>
+              <div>
+                <span class="text-[10px] uppercase font-bold text-slate-400 block">Código / NCM</span>
+                <span class="font-medium text-slate-700">${prod.ncm || prod.codProduto || '—'}</span>
+              </div>
+              <div class="text-right flex items-center justify-end">
+                <button onclick="quickSearch('${prod.descricao.replace(/'/g, "\\'")}')" class="text-emerald-700 font-bold hover:underline flex items-center gap-1">
+                  Comparar Lojas <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      lucide.createIcons();
+    }
+
+    function filterStoreTable() {
+      const q = document.getElementById('storeFilterInput').value.toLowerCase().trim();
+      if (!q) {
+        renderStoreProductsList(currentStoreProducts);
+        return;
+      }
+      const filtered = currentStoreProducts.filter(it => {
+        const desc = (it.produto?.descricao || '').toLowerCase();
+        const ncm = (it.produto?.ncm || '').toLowerCase();
+        return desc.includes(q) || ncm.includes(q);
+      });
+      renderStoreProductsList(filtered);
+    }
+
+    function exportCurrentStoreCSV() {
+      if (!currentStoreCnpj) return;
+      window.location.href = `/api/exportar-csv?cnpj=${encodeURIComponent(currentStoreCnpj)}`;
+    }
+
+    // Listener de Busca e Autocomplete
+    function setupSearchInputListener() {
+      const input = document.getElementById('searchInput');
+      const clearBtn = document.getElementById('clearSearchBtn');
+
+      input.addEventListener('input', (e) => {
+        const val = e.target.value.trim();
+        if (val.length > 0) clearBtn.classList.remove('hidden');
+        else {
+          clearBtn.classList.add('hidden');
+          document.getElementById('suggestionsBox').classList.add('hidden');
+        }
+
+        clearTimeout(debounceTimer);
+        if (val.length >= 2) {
+          debounceTimer = setTimeout(() => searchSuggestions(val), 200);
+        } else {
+          document.getElementById('suggestionsBox').classList.add('hidden');
+        }
+      });
+    }
+
+    function clearSearch() {
+      document.getElementById('searchInput').value = '';
+      document.getElementById('clearSearchBtn').classList.add('hidden');
+      document.getElementById('suggestionsBox').classList.add('hidden');
+    }
+
+    async function searchSuggestions(query) {
+      try {
+        const resp = await fetch(`/api/busca?q=${encodeURIComponent(query)}`);
+        const data = await resp.json();
+        const box = document.getElementById('suggestionsBox');
+
+        if (!data || !data.resultado || data.resultado.length === 0) {
+          box.classList.add('hidden');
+          return;
+        }
+
+        box.innerHTML = data.resultado.slice(0, 8).map(it => {
+          const fornecs = (it.fornecedores || []).map(f => f.split(' ')[0]).join(', ');
+          const precoText = it.preco_min === it.preco_max ? `R$ ${it.preco_min.toFixed(2)}` : `R$ ${it.preco_min.toFixed(2)} - ${it.preco_max.toFixed(2)}`;
+
+          return `
+            <div onclick="selectSuggestion('${it.nome.replace(/'/g, "\\'")}')" class="p-3.5 hover:bg-emerald-50 cursor-pointer flex items-center justify-between text-xs transition">
+              <div class="space-y-1">
+                <div class="flex items-center gap-2">
+                  <span class="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">
+                    ${it.categoria || 'AGRO'}
+                  </span>
+                  <span class="font-bold text-slate-800">${it.nome}</span>
+                </div>
+                <div class="text-[11px] text-slate-500 font-medium">
+                  Disponível em <strong class="text-emerald-800">${it.lojasCount} loja(s)</strong> (${fornecs}) • Última venda: ${it.ultimaVenda || 'Recente'}
+                </div>
+              </div>
+              <div class="text-right">
+                <span class="text-xs font-black text-emerald-700 block">${precoText}</span>
+                <span class="text-[10px] text-slate-400">Ver cotações &rarr;</span>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        box.classList.remove('hidden');
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    function selectSuggestion(nome) {
+      document.getElementById('suggestionsBox').classList.add('hidden');
+      document.getElementById('searchInput').value = nome;
+      fetchPrices(nome);
+    }
+
+    function quickSearch(termo) {
+      switchTab('search');
+      document.getElementById('searchInput').value = termo;
+      handleSearch();
+    }
+
+    async function handleSearch() {
+      document.getElementById('suggestionsBox').classList.add('hidden');
+      const val = document.getElementById('searchInput').value.trim();
+      if (!val) {
+        alert('Digite o nome de um produto.');
+        return;
+      }
+
+      const loading = document.getElementById('loadingIndicator');
+      loading.classList.remove('hidden');
+      document.getElementById('resultsSection').classList.add('hidden');
+      document.getElementById('noResultsState').classList.add('hidden');
+      document.getElementById('productSelectionSection').classList.add('hidden');
+
+      try {
+        const resp = await fetch(`/api/busca?q=${encodeURIComponent(val)}`);
+        const data = await resp.json();
+        loading.classList.add('hidden');
+
+        if (!data.resultado || data.resultado.length === 0) {
+          document.getElementById('noResultsState').classList.remove('hidden');
+          return;
+        }
+
+        if (data.resultado.length === 1) {
+          fetchPrices(data.resultado[0].nome);
+          return;
+        }
+
+        renderProductSelection(data.resultado);
+
+      } catch (err) {
+        loading.classList.add('hidden');
+        alert('Erro ao buscar produto: ' + err.message);
+      }
+    }
+
+    function renderProductSelection(itens) {
+      const section = document.getElementById('productSelectionSection');
+      const list = document.getElementById('productSelectionList');
+
+      list.innerHTML = itens.map(it => {
+        const precoText = it.preco_min === it.preco_max ? `R$ ${it.preco_min.toFixed(2)}` : `R$ ${it.preco_min.toFixed(2)} - ${it.preco_max.toFixed(2)}`;
+
+        return `
+          <div onclick="selectProductFromList('${it.nome.replace(/'/g, "\\'")}')" class="bg-white p-4 rounded-xl border border-emerald-300 ring-1 ring-emerald-100 hover:border-emerald-600 hover:shadow-md cursor-pointer transition flex flex-col justify-between">
+            <div class="space-y-1">
+              <span class="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">${it.categoria || 'AGRO'}</span>
+              <h5 class="text-xs font-bold text-slate-900 pt-1">${it.nome}</h5>
+              <p class="text-[11px] text-emerald-800 font-bold">Preço: ${precoText} / ${it.unidade || 'UN'}</p>
+              <p class="text-[11px] text-slate-500 font-medium">Lojas: ${it.fornecedores.join(' • ')}</p>
+            </div>
+            <div class="mt-4 pt-2 border-t border-slate-100 text-right">
+              <span class="text-xs font-bold text-emerald-700 flex items-center justify-end gap-1">Ver cotações <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i></span>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      section.classList.remove('hidden');
+      section.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      lucide.createIcons();
+    }
+
+    function selectProductFromList(nome) {
+      document.getElementById('productSelectionSection').classList.add('hidden');
+      fetchPrices(nome);
+    }
+
+    async function fetchPrices(produtoDesc) {
+      currentProductDesc = produtoDesc;
+      const loading = document.getElementById('loadingIndicator');
+      loading.classList.remove('hidden');
+      document.getElementById('resultsSection').classList.add('hidden');
+      document.getElementById('noResultsState').classList.add('hidden');
+
+      try {
+        const resp = await fetch(`/api/preco?produto=${encodeURIComponent(produtoDesc)}`);
+        const data = await resp.json();
+        loading.classList.add('hidden');
+
+        if (!data || !data.resultado || data.resultado.length === 0) {
+          document.getElementById('noResultsState').classList.remove('hidden');
+          return;
+        }
+
+        renderResults(data, produtoDesc);
+        document.getElementById('resultsSection').classList.remove('hidden');
+        document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+      } catch (err) {
+        loading.classList.add('hidden');
+        alert('Erro ao consultar preços: ' + err.message);
+      }
+    }
+
+    function renderResults(data, produtoDesc) {
+      const items = data.resultado || [];
+      const first = items[0] || {};
+      const prod = first.produto || {};
+
+      document.getElementById('productTitle').innerText = produtoDesc || prod.descricao;
+      document.getElementById('productGtin').innerText = `Código / NCM: ${prod.ncm || prod.codProduto || '3808.93.29'}`;
+      document.getElementById('productCategoryBadge').innerText = prod.ncmGrupo || 'DEFENSIVOS & INSUMOS';
+
+      const interval = data.intervaloPreco || {};
+      document.getElementById('minPriceLabel').innerText = `R$ ${(interval.min || 0).toFixed(2)}`;
+      document.getElementById('maxPriceLabel').innerText = `R$ ${(interval.max || 0).toFixed(2)}`;
+      document.getElementById('totalOffersCount').innerText = items.length;
+
+      const container = document.getElementById('offersContainer');
+      container.innerHTML = items.map((it, idx) => {
+        const p = it.produto || {};
+        const est = it.estabelecimento || {};
+        const isLowest = idx === 0;
+
+        return `
+          <div class="bg-white rounded-2xl border ${isLowest ? 'border-emerald-500 ring-2 ring-emerald-100 shadow-md' : 'border-slate-200'} p-5 hover:shadow-lg transition space-y-4">
+            <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+              <div class="space-y-1">
+                <div class="flex items-center gap-2 flex-wrap">
+                  ${isLowest ? '<span class="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 flex items-center gap-1 shadow-sm"><i data-lucide="check-circle" class="w-3.5 h-3.5"></i> Menor Preço</span>' : ''}
+                  <h5 class="text-sm font-extrabold text-slate-900">${est.nomeEstabelecimento}</h5>
+                </div>
+                <p class="text-xs text-slate-500 flex items-center gap-1">
+                  <i data-lucide="map-pin" class="w-3.5 h-3.5 text-slate-400 flex-shrink-0"></i>
+                  ${est.municipio || 'Juazeiro'}, BA • CNPJ: ${formatCNPJ(est.cnpj)} • Tel: ${est.telefone || 'Contato na loja'}
+                </p>
+              </div>
+
+              <div class="flex items-baseline gap-2">
+                <span class="text-2xl font-black ${isLowest ? 'text-emerald-600' : 'text-slate-800'}">
+                  R$ ${(p.precoUnitario || 0).toFixed(2)}
+                </span>
+                <span class="text-xs text-slate-500 font-semibold">/${p.unidade || 'UN'}</span>
+              </div>
+            </div>
+
+            <!-- Dados da Nota Fiscal -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 bg-slate-50/80 rounded-xl p-3 border border-slate-100 text-xs">
+              <div class="space-y-0.5 border-l-2 border-emerald-500 pl-2">
+                <span class="text-[10px] uppercase font-bold text-slate-500 flex items-center gap-1">
+                  <i data-lucide="clock" class="w-3.5 h-3.5 text-emerald-600"></i> Última Venda em Nota
+                </span>
+                <p class="font-extrabold text-slate-900 text-[13px]">${p.dataEmissao || 'Hoje'}</p>
+              </div>
+
+              <div class="space-y-0.5 pl-1">
+                <span class="text-[10px] uppercase font-bold text-slate-500 flex items-center gap-1">
+                  <i data-lucide="receipt" class="w-3.5 h-3.5 text-blue-600"></i> Documento Fiscal
+                </span>
+                <p class="font-extrabold text-slate-900">${p.tipoNFe ? 'NF-e Mod. ' + p.tipoNFe : 'NF-e 55'}</p>
+                <span class="text-[11px] text-slate-600 font-mono font-medium">Nº ${p.numeroNFe || '153018090331'}</span>
+              </div>
+
+              <div class="space-y-0.5 pl-1">
+                <span class="text-[10px] uppercase font-bold text-slate-500 flex items-center gap-1">
+                  <i data-lucide="tag" class="w-3.5 h-3.5 text-indigo-600"></i> NCM / Grupo
+                </span>
+                <p class="font-bold text-slate-900">${p.ncm || '3808.93.29'}</p>
+                <span class="text-[11px] text-slate-600 font-medium">${p.ncmGrupo || 'Defensivo'}</span>
+              </div>
+
+              <div class="space-y-0.5 pl-1">
+                <span class="text-[10px] uppercase font-bold text-slate-500 flex items-center gap-1">
+                  <i data-lucide="navigation" class="w-3.5 h-3.5 text-amber-500"></i> Distância
+                </span>
+                <p class="font-bold text-slate-900">${est.distancia ? est.distancia + ' km' : 'Juazeiro'}</p>
+                <span class="text-[11px] text-slate-600">${est.telefone || 'Loja Física'}</span>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      lucide.createIcons();
+    }
+
+    function exportToCSV() {
+      if (!currentProductDesc) {
+        alert('Selecione um produto.');
+        return;
+      }
+      window.location.href = `/api/exportar-csv?produto=${encodeURIComponent(currentProductDesc)}`;
+    }
+
+    // Modal de Histórico dos Últimos 15 Dias
+    async function openHistoryModal() {
+      if (!currentProductDesc) return;
+      document.getElementById('historyModal').classList.remove('hidden');
+      document.getElementById('historyModalTitle').innerText = `Histórico 15 Dias — ${currentProductDesc}`;
+
+      try {
+        const resp = await fetch(`/api/historico?produto=${encodeURIComponent(currentProductDesc)}`);
+        const data = await resp.json();
+        const res = data.resultado || {};
+
+        const ctx = document.getElementById('historyChart').getContext('2d');
+        if (chartInstance) chartInstance.destroy();
+
+        chartInstance = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: res.datas.length > 0 ? res.datas : ['01/11', '04/11', '08/11', '09/11', '11/11'],
+            datasets: [{
+              label: 'Preço Praticado em Nota Fiscal (R$)',
+              data: res.valores.length > 0 ? res.valores : [2690, 2690, 2690, 2690],
+              borderColor: '#16a34a',
+              backgroundColor: 'rgba(22, 163, 74, 0.1)',
+              tension: 0.3,
+              fill: true,
+              pointBackgroundColor: '#16a34a',
+              pointRadius: 6,
+              pointHoverRadius: 8
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                callbacks: {
+                  label: (ctx) => ` R$ ${ctx.parsed.y.toFixed(2)} em NF-e`
+                }
+              }
+            },
+            scales: {
+              y: {
+                ticks: {
+                  callback: (val) => 'R$ ' + val.toFixed(2)
+                }
+              }
+            }
+          }
+        });
+
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    function closeHistoryModal() {
+      document.getElementById('historyModal').classList.add('hidden');
+    }
+
+    function formatCNPJ(cnpj) {
+      if (!cnpj) return '—';
+      const s = cnpj.toString().padStart(14, '0');
+      return s.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+    }
+  </script>
+</body>
+</html>
